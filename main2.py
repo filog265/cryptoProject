@@ -38,13 +38,11 @@ def shiftEncode(msg, key):
     shift = int(key)
 
     for x in msg:
-        if isinstance(x, str):  # Si c'est une string
-            val = ord(x)
-        else:  # Si c'est déjà un byte (ex : après un décodage UTF-8 partiel)
-            val = x
-
-        shifted = (val + shift) % 256  # reste dans la plage d'1 byte
-        encodedMsg += bytes([shifted])
+        charInt = int.from_bytes(x.encode("utf-8"), byteorder="big")
+        charInt += shift
+        charByte = charInt.to_bytes(4, byteorder="big")
+        #charUtf8 = charByte.decode("utf-8")
+        encodedMsg += charByte
 
     return encodedMsg
 
@@ -162,42 +160,21 @@ def convertMessage(msg):
             finalMessage += x.to_bytes(4, byteorder = "big")
         else:
             # x est un caractère (str)
-            charBytes = int.from_bytes(x.encode("utf-8"), byteorder="big")
-            charBytes = charBytes.to_bytes(4, byteorder = "big")
-            finalMessage += charBytes
+            charInt = int.from_bytes(x.encode("utf-8"), byteorder="big")
+            charByte = charInt.to_bytes(4, byteorder = "big")
+            finalMessage += charByte
     return finalMessage
 
 def giveOriginalMessage(convertedMsg):
-    original_bytes = bytearray()
-    i = 0
-    length = len(convertedMsg)
+    res = ""
+    conM = convertedMsg
+    while conM != b"":
+        charB = conM[:4]
+        conM = conM[4:]
+        res += charB.decode("utf-8")
 
-    while i < length:
-        # Cas ASCII : préfixe \x00\x00\x00 suivi d'1 octet
-        if i + 3 < length and convertedMsg[i:i + 3] == b"\x00\x00\x00":
-            original_bytes.append(convertedMsg[i + 3])
-            i += 4
+    return res
 
-        # Cas UTF-8 : préfixe \x00\x00 suivi d'1 ou plusieurs octets
-        elif i + 2 < length and convertedMsg[i:i + 2] == b"\x00\x00":
-            i += 2
-            # Lire les bytes suivants jusqu’au prochain préfixe ou fin
-            while i < length and not (
-                convertedMsg[i:i + 3] == b"\x00\x00\x00" or
-                convertedMsg[i:i + 2] == b"\x00\x00"
-            ):
-                original_bytes.append(convertedMsg[i])
-                i += 1
-
-        else:
-            # Saut de sécurité si on tombe sur un format inattendu
-            i += 1
-
-    try:
-        return original_bytes.decode("utf-8")
-    except UnicodeDecodeError as e:
-        print("⚠️ Erreur de décodage UTF-8, message tronqué.")
-        return original_bytes.decode("utf-8", errors="replace")
 
 def removeHeader(msg):
     return msg[6:]
