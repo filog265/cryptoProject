@@ -28,11 +28,6 @@ def reception(type):
 
     return returnRecep
 
-def toHex(number):  # Fonction qui convertit un numéro en hexadecimal (utilisé pour la taille du message envoyé)
-    msb = (number >> 8) & 0xFF
-    lsb = number & 0xFF
-    return bytes([msb, lsb])
-
 def shiftEncode(msg, key):
     encodedMsg = b""
     shift = int(key)
@@ -77,7 +72,8 @@ def vigenereEncode(msg, key):  # Fonction qui encode un message avec l'encodage 
 
 def sTypeMessage(mT):  # Fonction qui s'occupe des messages de type 's'
     task = input("Enter task: ")
-    s.sendall(addMessageHeader(mT) + addMessageSize(task) + convertMessage(task))
+    taskSize = len(task)
+    s.sendall(addMessageHeader(mT) + addMessageSize(taskSize) + convertMessage(task))
     taskMessage = ""
     f = True
     while f:
@@ -86,7 +82,8 @@ def sTypeMessage(mT):  # Fonction qui s'occupe des messages de type 's'
         if taskMessage == "Unknown command or no task running" or taskMessage == "Wrong task parameters":
             print(taskMessage)
             task = input("Enter task: ")
-            s.sendall(addMessageHeader(mT) + addMessageSize(task) + convertMessage(task))
+            taskSize = len(task)
+            s.sendall(addMessageHeader(mT) + addMessageSize(taskSize) + convertMessage(task))
         else:
             f = False
 
@@ -100,7 +97,11 @@ def sTypeMessage(mT):  # Fonction qui s'occupe des messages de type 's'
     if "shift" in task:
         if "encode" in task:
             encodedResult = shiftEncode(messageToEncodeDecode, taskKey[1])
-            s.sendall(addMessageHeader(mT) + addMessageSize(encodedResult) + convertMessage(encodedResult))
+            size = len(encodedResult) // 4
+            mess = addMessageHeader(mT) + addMessageSize(size) + encodedResult
+            #print(len(encodedResult))
+            #print(encodedResult)
+            s.sendall(mess)
         elif "decode" in task:
             decodedResult = shiftDecode(messageToEncodeDecode.decode(), taskKey[1])
             print("Your decoding gave this result: " + decodedResult)
@@ -146,10 +147,9 @@ def addMessageHeader(msgType):  # Renvoie le header du message
 
     return header
 
-def addMessageSize(msg):  # Renvoie la taille du message
+def addMessageSize(n):  # Renvoie la taille du message
     size = b""
-    a = len(msg)
-    size += toHex(a)
+    size += n.to_bytes(2, byteorder="big")
 
     return size
 
@@ -171,7 +171,9 @@ def giveOriginalMessage(convertedMsg):
     while conM != b"":
         charB = conM[:4]
         conM = conM[4:]
-        res += charB.decode("utf-8")
+        a = charB.split(b"\x00")
+        num = a[len(a)-1]
+        res += num.decode("utf-8")
 
     return res
 
